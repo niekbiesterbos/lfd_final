@@ -1,0 +1,16 @@
+numpy
+pandas
+scikit-learn
+torch>=2.1
+torchtext
+tqdm
+transformers>=4.40.2
+accelerate
+datasets
+emoji
+tqdm
+evaluate
+tiktoken
+protobuf
+sentencepiece
+matplotlib
