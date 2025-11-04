@@ -15,9 +15,7 @@ from sklearn.metrics import (
     cohen_kappa_score
 )
 
-# ----------------------------
-# Config
-# ----------------------------
+
 TEST_PATH = "data/test.tsv"
 RUNS = {
     "svm": "artifacts/svm/test_pred.tsv",
@@ -34,9 +32,6 @@ np.random.seed(RANDOM_SEED)
 LABEL_MAP = {"NOT": 0, "OFF": 1}
 INV_LABEL_MAP = {0: "NOT", 1: "OFF"}
 
-# ----------------------------
-# Helpers
-# ----------------------------
 
 def load_gold(test_path: str) -> pd.DataFrame:
     df = pd.read_csv(test_path, sep="\t", header=None, names=["text", "label"])
@@ -46,10 +41,12 @@ def load_gold(test_path: str) -> pd.DataFrame:
         raise ValueError(f"Unexpected labels in {test_path}: {bad}")
     return df
 
+
 def load_preds(pred_path: str) -> pd.Series:
     if not os.path.exists(pred_path):
         raise FileNotFoundError(f"Missing predictions file: {pred_path}")
-    p = pd.read_csv(pred_path, sep="\t", header=None, names=["pred_raw"])["pred_raw"].astype(str).str.strip()
+    p = pd.read_csv(pred_path, sep="\t", header=None, names=["pred_raw"])[
+        "pred_raw"].astype(str).str.strip()
     # Try int 0/1, else try map NOT/OFF, else try probabilities -> threshold .5
     try:
         pred = p.astype(int)
@@ -62,8 +59,10 @@ def load_preds(pred_path: str) -> pd.Series:
                 prob = p.astype(float)
                 pred = (prob >= 0.5).astype(int)
             except ValueError:
-                raise ValueError("Predictions must be ints {0,1}, labels {NOT,OFF}, or probabilities in [0,1].")
+                raise ValueError(
+                    "Predictions must be ints {0,1}, labels {NOT,OFF}, or probabilities in [0,1].")
     return pred
+
 
 def plot_confusion(cm: np.ndarray, labels: list, title: str, outpath: Path) -> None:
     fig, ax = plt.subplots(figsize=(4.6, 4.2), dpi=160)
@@ -81,12 +80,14 @@ def plot_confusion(cm: np.ndarray, labels: list, title: str, outpath: Path) -> N
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
             val = cm[i, j]
-            ax.text(j, i, str(val), ha="center", va="center", color="black" if val < 0.7*max_val else "white")
+            ax.text(j, i, str(val), ha="center", va="center",
+                    color="black" if val < 0.7*max_val else "white")
 
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     fig.tight_layout()
     fig.savefig(outpath, bbox_inches="tight")
     plt.close(fig)
+
 
 def to_latex_table(df: pd.DataFrame, caption: str, label: str) -> str:
     # Escape underscores in index
@@ -94,14 +95,12 @@ def to_latex_table(df: pd.DataFrame, caption: str, label: str) -> str:
     df_latex.index = [str(i).replace("_", r"\_") for i in df_latex.index]
     return df_latex.to_latex(escape=True, caption=caption, label=label, index=True, float_format="%.4f")
 
-# ----------------------------
-# Evaluation
-# ----------------------------
 
 def evaluate_run(name: str, pred_path: str, gold_df: pd.DataFrame) -> dict:
     pred = load_preds(pred_path)
     if len(pred) != len(gold_df):
-        raise ValueError(f"Row count mismatch for {name}: test={len(gold_df)}, preds={len(pred)}")
+        raise ValueError(
+            f"Row count mismatch for {name}: test={len(gold_df)}, preds={len(pred)}")
 
     df = gold_df.copy()
     df["pred"] = pred.values
@@ -117,7 +116,8 @@ def evaluate_run(name: str, pred_path: str, gold_df: pd.DataFrame) -> dict:
     kappa = cohen_kappa_score(gold, yhat)
 
     # Per-class
-    p, r, f1, support = precision_recall_fscore_support(gold, yhat, labels=[0,1], zero_division=0)
+    p, r, f1, support = precision_recall_fscore_support(
+        gold, yhat, labels=[0, 1], zero_division=0)
     per_class = pd.DataFrame({
         "class": [INV_LABEL_MAP[0], INV_LABEL_MAP[1]],
         "precision": p,
@@ -127,13 +127,14 @@ def evaluate_run(name: str, pred_path: str, gold_df: pd.DataFrame) -> dict:
     }).set_index("class")
 
     # Confusion matrix
-    cm = confusion_matrix(gold, yhat, labels=[0,1])
+    cm = confusion_matrix(gold, yhat, labels=[0, 1])
     cm_path = OUTDIR / f"{name}_confusion.png"
     plot_confusion(cm, labels=[INV_LABEL_MAP[0], INV_LABEL_MAP[1]],
                    title=f"Confusion Matrix — {name}", outpath=cm_path)
 
     # Classification report text (for quick inspection)
-    clf_text = classification_report(gold, yhat, target_names=[INV_LABEL_MAP[0], INV_LABEL_MAP[1]], zero_division=0)
+    clf_text = classification_report(gold, yhat, target_names=[
+                                     INV_LABEL_MAP[0], INV_LABEL_MAP[1]], zero_division=0)
 
     # Save tables
     summary = pd.DataFrame({
@@ -148,14 +149,16 @@ def evaluate_run(name: str, pred_path: str, gold_df: pd.DataFrame) -> dict:
     per_class_tex = OUTDIR / f"{name}_per_class.tex"
     per_class.to_csv(per_class_csv)
     with open(per_class_tex, "w") as f:
-        f.write(to_latex_table(per_class, caption=f"Per-class metrics for {name}.", label=f"tab:{name}_perclass"))
+        f.write(to_latex_table(
+            per_class, caption=f"Per-class metrics for {name}.", label=f"tab:{name}_perclass"))
 
     # Save summary row as CSV and LaTeX (append later across runs)
     summary_csv = OUTDIR / f"{name}_summary.csv"
     summary_tex = OUTDIR / f"{name}_summary.tex"
     summary.to_csv(summary_csv)
     with open(summary_tex, "w") as f:
-        f.write(to_latex_table(summary, caption=f"Overall metrics for {name}.", label=f"tab:{name}_summary"))
+        f.write(to_latex_table(
+            summary, caption=f"Overall metrics for {name}.", label=f"tab:{name}_summary"))
 
     # Save a small sample of mismatches (for qualitative error analysis)
     mismatches = df[df["gold"] != df["pred"]]
@@ -165,7 +168,8 @@ def evaluate_run(name: str, pred_path: str, gold_df: pd.DataFrame) -> dict:
         mm = mismatches.sample(sample_size, random_state=RANDOM_SEED).copy()
         mm["gold_label"] = mm["gold"].map(INV_LABEL_MAP)
         mm["pred_label"] = mm["pred"].map(INV_LABEL_MAP)
-        mm[["text", "gold_label", "pred_label"]].to_csv(sample_path, sep="\t", index=False)
+        mm[["text", "gold_label", "pred_label"]].to_csv(
+            sample_path, sep="\t", index=False)
 
     # Pretty print
     print("="*72)
@@ -190,6 +194,7 @@ def evaluate_run(name: str, pred_path: str, gold_df: pd.DataFrame) -> dict:
         "cm_path": str(cm_path)
     }
 
+
 def main():
     gold_df = load_gold(TEST_PATH)
 
@@ -201,7 +206,7 @@ def main():
 
     # Combine overall summary into one table for LaTeX/CSV
     summary_df = pd.DataFrame(
-        [{k: v for k, v in r.items() if k in {"name","accuracy","macro_f1","micro_f1","weighted_f1","kappa"}}
+        [{k: v for k, v in r.items() if k in {"name", "accuracy", "macro_f1", "micro_f1", "weighted_f1", "kappa"}}
          for r in all_summaries]
     ).set_index("name").sort_index()
 
@@ -221,9 +226,6 @@ def main():
     print(f"- Saved LaTeX table -> {summary_tex}")
     print("Done.")
 
+
 if __name__ == "__main__":
     main()
-
-
-
-
